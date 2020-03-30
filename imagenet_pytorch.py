@@ -77,7 +77,7 @@ model_names = sorted(name for name in models.__dict__
 best_acc1 = 0
 
 
-def main(parsed_arguements):
+def start_training_session(parsed_arguements):
     state_object = parsed_arguements
     if state_object.seed is not None:
         random.seed(state_object.seed)
@@ -88,13 +88,12 @@ def main(parsed_arguements):
                       'which can slow down your training considerably! '
                       'You may see unexpected behavior when restarting '
                       'from checkpoints.')
-    main_worker(state_object)
+    return main_worker(state_object)
 
 
 
 def main_worker(state_object):
     global best_acc1
-
     # create model
     if state_object.pretrained:
         print("=> using pre-trained model '{}'".format(state_object.arch))
@@ -104,6 +103,7 @@ def main_worker(state_object):
         model = models.__dict__[state_object.arch]()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     print("Going to Train on ","cuda" if torch.cuda.is_available() else "cpu")
 
     state_object.trained_on_gpu = True if torch.cuda.is_available() else False
@@ -186,27 +186,29 @@ def main_worker(state_object):
         num_workers=state_object.workers, pin_memory=True)
 
     if state_object.evaluate:
-        validate(val_loader, model, criterion, state_object)
+        validate(val_loader, model, criterion, state_object,device)
         return
     
     print("Training/Testing Datasets Loaded!")
-    
+    epoch_histories = {
+        'train': [],
+        'validation': []
+    }
     for epoch in range(state_object.start_epoch, state_object.epochs):
-
         adjust_learning_rate(optimizer, epoch, state_object)
         if epoch % 2 == 0:
             print("Training Epoch : ",epoch)
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, state_object,device)
-
+        train_history = train(train_loader, model, criterion, optimizer, epoch, state_object,device)
+        epoch_histories['train'].append(train_history)
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, state_object)
-
+        acc1,validation_history = validate(val_loader, model, criterion, state_object,device)
+        epoch_histories['validation'].append(validation_history)
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
 
-        # todo : add checkpointing.
+        # todo : add checkpointing of best model.
         # if not state_object.multiprocessing_distributed or (state_object.multiprocessing_distributed
         #         and state_object.rank % ngpus_per_node == 0):
         #     save_checkpoint({
@@ -216,9 +218,14 @@ def main_worker(state_object):
         #         'best_acc1': best_acc1,
         #         'optimizer' : optimizer.state_dict(),
         #     }, is_best)
-
+    return epoch_histories
 
 def train(train_loader, model, criterion, optimizer, epoch, state_object,device):
+    history = {
+        'loss': [],
+        'accuracy':[],
+        'batch_time':[]
+    }
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -259,12 +266,22 @@ def train(train_loader, model, criterion, optimizer, epoch, state_object,device)
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
-
+        history['accuracy'].append(float(top1.avg))
+        history['loss'].append(float(losses.avg))
+        history['batch_time'].append(float(batch_time.avg))
+        
         if i % state_object.print_frequency == 0:
             progress.display(i)
+    
+    return history
 
 
 def validate(val_loader, model, criterion, state_object,device):
+    history = {
+        'loss': [],
+        'accuracy':[],
+        'batch_time':[]
+    }
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
@@ -296,15 +313,18 @@ def validate(val_loader, model, criterion, state_object,device):
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
+            history['accuracy'].append(float(top1.avg))
+            history['loss'].append(float(losses.avg))
+            history['batch_time'].append(float(batch_time.avg))
 
-            if i % state_object.print_freq == 0:
+            if i % state_object.print_frequency == 0:
                 progress.display(i)
 
         # TODO: this should also be done with the ProgressMeter
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
 
-    return top1.avg
+    return top1.avg,history
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):

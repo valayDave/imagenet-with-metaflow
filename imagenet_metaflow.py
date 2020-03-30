@@ -1,4 +1,4 @@
-from metaflow import FlowSpec, step, Parameter,IncludeFile
+from metaflow import FlowSpec, step, Parameter,IncludeFile,kube,environment
 from constants import supported_models
 import os
 
@@ -37,9 +37,9 @@ class ImageNetExperimentationFlow(FlowSpec):
                             ' | '.join(supported_models) +
                             ' (default: resnet18)')
 
-    workers = Parameter('workers', default=4, type=int, metavar='N',
+    workers = Parameter('workers', default=6, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
-    epochs = Parameter('epochs', default=90, type=int, metavar='N',
+    epochs = Parameter('epochs', default=1, type=int, metavar='N',
                         help='number of total epochs to run')
     start_epoch = Parameter('start_epoch', default=0, type=int, metavar='N',
                         help='manual epoch number (useful on restarts)')
@@ -77,7 +77,7 @@ class ImageNetExperimentationFlow(FlowSpec):
     # Parameter('dist-backend', default='nccl', type=str,
     #                     help='distributed backend')
     
-
+    # ! This is causing a bug in the KubeDeployRuntime 
     seed = Parameter('seed', default=None, type=int,
                         help='seed for initializing training. ')
     
@@ -97,13 +97,15 @@ class ImageNetExperimentationFlow(FlowSpec):
         self.used_num_gpus = 0 
         self.next(self.train_model)
 
-
+    @kube(cpu=3,memory=20000,gpu=1,image='anibali/pytorch:cuda-10.1')
+    @environment(vars={"LC_ALL":"C.UTF-8","LANG":"C.UTF-8"})
     @step
     def train_model(self):
         from zipfile import ZipFile
         from io import BytesIO
         import random 
         import imagenet_pytorch
+        import json
         # Create Directory for deloading dataset. 
         random_hex = str(hex(random.randint(0,16777215)))
         self.dataset_final_path = script_path('dataset-'+random_hex)
@@ -118,14 +120,15 @@ class ImageNetExperimentationFlow(FlowSpec):
         dataset_zip_file.extractall(self.dataset_final_path)
         print("Extracted Dataset")
         self.dataset_final_path = os.path.join(self.dataset_final_path,self.zipped_dataset_name)
-        
-        imagenet_pytorch.main(self)
+        results = imagenet_pytorch.start_training_session(self)
+        # Need to save like this otherwise there are Pickle Serialisation problems. 
+        self.epoch_histories = json.loads(json.dumps(results))
         self.next(self.end)
 
-        
+
     @step
     def end(self):
-        pass
+        print("Completed Computation !")
         # self.next(self.last)
 
 if __name__ == '__main__':
