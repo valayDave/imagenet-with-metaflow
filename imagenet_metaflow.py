@@ -29,6 +29,9 @@ class ImageNetExperimentationFlow(FlowSpec):
     # zipped_dataset = IncludeFile('zipped_dataset', default=script_path('./tiny-imagenet-200.zip'),
     #                 help='path to ZIPPED dataset',is_text=False)
     
+    dataset_s3_path = Parameter('dataset_s3_path',default='s3://metaflow-experiments-datastore/metaflow_store/Datasets/tiny-imagenet-200.zip',
+                            help='Path To the Dataset on S3.')
+
     zipped_dataset_name = Parameter('zipped_dataset_name',default='tiny-imagenet-200',
                             help='Name of folder Which is created when dataset is Untared')
     
@@ -103,7 +106,7 @@ class ImageNetExperimentationFlow(FlowSpec):
         import imagenet_pytorch
         import json
         with S3() as s3:
-            zipped_dataset = s3.get("s3://metaflow-experiments-datastore/metaflow_store/Datasets/tiny-imagenet-200.zip").blob
+            zipped_dataset = s3.get(self.dataset_s3_path).blob
         # Create Directory for deloading dataset. 
         random_hex = str(hex(random.randint(0,16777215)))
         self.dataset_final_path = script_path('dataset-'+random_hex)
