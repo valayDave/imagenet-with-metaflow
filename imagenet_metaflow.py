@@ -62,7 +62,6 @@ class ImageNetExperimentationFlow(FlowSpec):
     # Parameter('resume', default='', type=str, metavar='PATH',
     #                     help='path to latest checkpoint (default: none)')
     
-    
     evaluate = Parameter('evaluate', help='evaluate model on validation set')
     pretrained = Parameter('pretrained',
                         help='use pre-trained model')
@@ -71,19 +70,9 @@ class ImageNetExperimentationFlow(FlowSpec):
     rank = Parameter('rank', default=-1, type=int,
                         help='node rank for distributed training')
     
-    # todo : Figure Distributed Support. 
-    # Parameter('dist-url', default='tcp://224.66.41.62:23456', type=str,
-    #                     help='url used to set up distributed training')
-    # Parameter('dist-backend', default='nccl', type=str,
-    #                     help='distributed backend')
-    
-    # ! This is causing a bug in the KubeDeployRuntime 
     seed = Parameter('seed', default=None, type=int,
                         help='seed for initializing training. ')
     
-    # Abstracting this out to use Decorators. 
-    # Parameter('gpu', default=None, type=int,
-    #                     help='GPU id to use.')
     multiprocessing_distributed = Parameter('multiprocessing_distributed',
                         type=bool,
                         help='Use multi-processing distributed training to launch '
