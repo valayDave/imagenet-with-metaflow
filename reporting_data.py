@@ -11,3 +11,4 @@ class ModelAnalytics():
         self.epoch_histories = None # This will hold the data about the losses at each Epoch 
         self.hyper_params = HyperParams() #
         self.model = None 
+        self.num_gpus = 0

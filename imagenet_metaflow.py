@@ -42,7 +42,7 @@ class ImageNetExperimentationFlow(FlowSpec):
 
     workers = Parameter('workers', default=3, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
-    epochs = Parameter('epochs', default=1, type=int, metavar='N',
+    epochs = Parameter('epochs', default=20, type=int, metavar='N',
                         help='number of total epochs to run')
     start_epoch = Parameter('start_epoch', default=0, type=int, metavar='N',
                         help='manual epoch number (useful on restarts)')
@@ -68,11 +68,7 @@ class ImageNetExperimentationFlow(FlowSpec):
     evaluate = Parameter('evaluate', help='evaluate model on validation set')
     pretrained = Parameter('pretrained',
                         help='use pre-trained model')
-    world_size = Parameter('world_size', default=-1, type=int,
-                        help='number of nodes for distributed training')
-    rank = Parameter('rank', default=-1, type=int,
-                        help='node rank for distributed training')
-    
+
     seed = Parameter('seed', default=None, type=int,
                         help='seed for initializing training. ')
     
@@ -82,27 +78,26 @@ class ImageNetExperimentationFlow(FlowSpec):
         self.trained_on_gpu = False
         self.used_num_gpus = 0 
         self.training_models = [    
-            # 'resnet101',
-            # 'resnet152',
-            # 'resnet34',
-            # 'googlenet',
+            'resnet101',
+            'resnet152',
+            'resnet34',
             'resnet18',
-            # 'resnet50',
+            'resnet50',
             'vgg11',
-            # 'vgg11_bn',
-            # 'vgg13',
-            # 'vgg13_bn',
-            # 'vgg16',
-            # 'vgg16_bn',
-            # 'vgg19',
-            # 'vgg19_bn',
-            # 'wide_resnet101_2',
-            # 'wide_resnet50_2'
+            'vgg11_bn',
+            'vgg13',
+            'vgg13_bn',
+            'vgg16',
+            'vgg16_bn',
+            'vgg19',
+            'vgg19_bn',
+            'wide_resnet101_2',
+            'wide_resnet50_2'
         ]
         self.next(self.train_model,foreach='training_models')
 
-    # @kube(cpu=4,memory=40000,gpu=4,image='anibali/pytorch:cuda-10.1')
-    # @environment(vars={"LC_ALL":"C.UTF-8","LANG":"C.UTF-8"})
+    @kube(cpu=4,memory=40000,gpu=4,image='anibali/pytorch:cuda-10.1')
+    @environment(vars={"LC_ALL":"C.UTF-8","LANG":"C.UTF-8"})
     @retry(times=3)
     @step
     def train_model(self):
@@ -134,10 +129,13 @@ class ImageNetExperimentationFlow(FlowSpec):
         # Need to save like this otherwise there are Pickle Serialisation problems. 
         self.epoch_histories = json.loads(json.dumps(results))
         self.next(self.join)
-
+    
+    @kube(cpu=4,memory=40000,image='anibali/pytorch:cuda-10.1')
+    @environment(vars={"LC_ALL":"C.UTF-8","LANG":"C.UTF-8"})
     @step
     def join(self,inputs):
         from reporting_data import ModelAnalytics
+        self.history = []
         for input_val in inputs:
             model_results = ModelAnalytics()
             model_results.architecture = input_val.arch
@@ -146,6 +144,7 @@ class ImageNetExperimentationFlow(FlowSpec):
             model_results.hyper_params.momentum = self.momentum
             model_results.hyper_params.weight_decay = self.weight_decay
             model_results.model = input_val.model
+            model_results.num_gpus = input_val.used_num_gpus
             self.history.append(model_results)
         # self.history = [{'param':input_val.arch,'history':input_val.epoch_histories} for input_val in inputs]
         self.next(self.end)
