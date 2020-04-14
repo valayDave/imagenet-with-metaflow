@@ -15,6 +15,13 @@ Repository contains code to parallise training of Imagenet using Metaflow with K
 
 - S3 Required for Parallelised GPU training on AWS. 
 
+## Running Instructions
+1. Upload dataset to S3 and change parameter `dataset_s3_path` in the `imagenet_metaflow.py` or add it into your run parameters. 
+2. To Run on Local, Comment out `@kube` decorator and use the below command: 
+    ```
+    python imagenet_metaflow.py --metadata local run --max-workers 2 
+    ```
+
 ## TODO 
 - [ ] Create Notebook to Show Results. 
 - [ ] Document the Models that are trained using this script.

@@ -1,6 +1,7 @@
-
+# Model Params sizes :
+# https://hewlettpackard.github.io/dlcookbook-dlbs/#/models/models?id=models
 supported_models = [
-        'alexnet',
+    'alexnet',
     'densenet121',
     'densenet161',
     'densenet169',

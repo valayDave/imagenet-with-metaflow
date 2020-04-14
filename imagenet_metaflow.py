@@ -1,4 +1,4 @@
-from metaflow import FlowSpec, step, Parameter,IncludeFile,kube,environment,S3
+from metaflow import FlowSpec, step, Parameter,IncludeFile,kube,environment,S3,retry
 from constants import supported_models
 import os
 
@@ -76,28 +76,34 @@ class ImageNetExperimentationFlow(FlowSpec):
     seed = Parameter('seed', default=None, type=int,
                         help='seed for initializing training. ')
     
-    multiprocessing_distributed = Parameter('multiprocessing_distributed',
-                        type=bool,
-                        help='Use multi-processing distributed training to launch '
-                            'N processes per node, which has N GPUs. This is the '
-                            'fastest way to use PyTorch for either single node or '
-                            'multi node data parallel training')
     @step
     def start(self):
         # todo : define Hyper Param Search Class
         self.trained_on_gpu = False
         self.used_num_gpus = 0 
         self.training_models = [    
-            'resnet101',
-            'resnet152',
+            # 'resnet101',
+            # 'resnet152',
+            # 'resnet34',
+            'googlenet',
             'resnet18',
-            'resnet34',
-            'resnet50',
+            # 'resnet50',
+            # 'vgg11',
+            # 'vgg11_bn',
+            # 'vgg13',
+            # 'vgg13_bn',
+            # 'vgg16',
+            # 'vgg16_bn',
+            # 'vgg19',
+            # 'vgg19_bn',
+            # 'wide_resnet101_2',
+            # 'wide_resnet50_2'
         ]
         self.next(self.train_model,foreach='training_models')
 
-    @kube(cpu=4,memory=40000,gpu=4,image='anibali/pytorch:cuda-10.1')
-    @environment(vars={"LC_ALL":"C.UTF-8","LANG":"C.UTF-8"})
+    # @kube(cpu=4,memory=40000,gpu=4,image='anibali/pytorch:cuda-10.1')
+    # @environment(vars={"LC_ALL":"C.UTF-8","LANG":"C.UTF-8"})
+    @retry(times=3)
     @step
     def train_model(self):
         from zipfile import ZipFile
@@ -122,14 +128,26 @@ class ImageNetExperimentationFlow(FlowSpec):
         dataset_zip_file.extractall(self.dataset_final_path)
         print("Extracted Dataset. Now Training :",self.arch)
         self.dataset_final_path = os.path.join(self.dataset_final_path,self.zipped_dataset_name)
-        results = imagenet_pytorch.start_training_session(self)
+        results,model = imagenet_pytorch.start_training_session(self)
+        model = model.to('cpu') # Save CPU based model state dict. 
+        self.model = model.state_dict()
         # Need to save like this otherwise there are Pickle Serialisation problems. 
         self.epoch_histories = json.loads(json.dumps(results))
         self.next(self.join)
 
     @step
     def join(self,inputs):
-        self.history = [{'param':input_val.arch,'history':input_val.epoch_histories} for input_val in inputs]
+        from reporting_data import ModelAnalytics
+        for input_val in inputs:
+            model_results = ModelAnalytics()
+            model_results.architecture = input_val.arch
+            model_results.epoch_histories = input_val.epoch_histories
+            model_results.hyper_params.batch_size = self.batch_size
+            model_results.hyper_params.momentum = self.momentum
+            model_results.hyper_params.weight_decay = self.weight_decay
+            model_results.model = input_val.model
+            self.history.append(model_results)
+        # self.history = [{'param':input_val.arch,'history':input_val.epoch_histories} for input_val in inputs]
         self.next(self.end)
 
     @step
