@@ -76,27 +76,6 @@ def main_worker(state_object):
                                 momentum=state_object.momentum,
                                 weight_decay=state_object.weight_decay)
 
-    # # todo optionally resume from a checkpoint
-    # if state_object.resume:
-    #     if os.path.isfile(state_object.resume):
-    #         print("=> loading checkpoint '{}'".format(state_object.resume))
-    #         if state_object.gpu is None:
-    #             checkpoint = torch.load(state_object.resume)
-    #         else:
-    #             # Map model to be loaded to specified single gpu.
-    #             loc = 'cuda:{}'.format(state_object.gpu)
-    #             checkpoint = torch.load(state_object.resume, map_location=loc)
-    #         state_object.start_epoch = checkpoint['epoch']
-    #         best_acc1 = checkpoint['best_acc1']
-    #         if state_object.gpu is not None:
-    #             # best_acc1 may be from a checkpoint from a different GPU
-    #             best_acc1 = best_acc1.to(state_object.gpu)
-    #         model.load_state_dict(checkpoint['state_dict'])
-    #         optimizer.load_state_dict(checkpoint['optimizer'])
-    #         print("=> loaded checkpoint '{}' (epoch {})"
-    #               .format(state_object.resume, checkpoint['epoch']))
-    #     else:
-    #         print("=> no checkpoint found at '{}'".format(state_object.resume))
     cudnn.benchmark = True
     # Data loading code
     traindir = os.path.join(state_object.dataset_final_path, 'train')
@@ -151,17 +130,7 @@ def main_worker(state_object):
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
 
-        # todo : add checkpointing of best model.
-        # if not state_object.multiprocessing_distributed or (state_object.multiprocessing_distributed
-        #         and state_object.rank % ngpus_per_node == 0):
-        #     save_checkpoint({
-        #         'epoch': epoch + 1,
-        #         'arch': state_object.arch,
-        #         'state_dict': model.state_dict(),
-        #         'best_acc1': best_acc1,
-        #         'optimizer' : optimizer.state_dict(),
-        #     }, is_best)
-    return epoch_histories
+    return epoch_histories , model
 
 def train(train_loader, model, criterion, optimizer, epoch, state_object,device):
     history = {
