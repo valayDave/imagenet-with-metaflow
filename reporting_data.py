@@ -12,3 +12,10 @@ class ModelAnalytics():
         self.hyper_params = HyperParams() #
         self.model = None 
         self.num_gpus = 0
+
+class FinalModel():
+    def __init__(self):
+        self.hyper_params = HyperParams() #
+        self.model = None 
+        self.epochs = 0
+        self.architecture = None

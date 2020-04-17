@@ -74,7 +74,7 @@ class ImageNetExperimentationFlow(FlowSpec):
     
     @step
     def start(self):
-        # todo : define Hyper Param Search Class
+        
         self.trained_on_gpu = False
         self.used_num_gpus = 0 
         self.training_models = [    
@@ -134,19 +134,28 @@ class ImageNetExperimentationFlow(FlowSpec):
     @environment(vars={"LC_ALL":"C.UTF-8","LANG":"C.UTF-8"})
     @step
     def join(self,inputs):
-        from reporting_data import ModelAnalytics
+        from reporting_data import ModelAnalytics,FinalModel
         self.history = []
+        self.models = []
         for input_val in inputs:
+            print("Downloading Models/Data for Arch,",input_val.arch)
             model_results = ModelAnalytics()
+            final_model = FinalModel()
+            # Saving Analytics Results. 
             model_results.architecture = input_val.arch
             model_results.epoch_histories = input_val.epoch_histories
             model_results.hyper_params.batch_size = self.batch_size
             model_results.hyper_params.momentum = self.momentum
             model_results.hyper_params.weight_decay = self.weight_decay
-            model_results.model = input_val.model
             model_results.num_gpus = input_val.used_num_gpus
+            # Saving Model Results. 
+            final_model.architecture = model_results.architecture
+            final_model.model = input_val.model
+            final_model.hyper_params = model_results.hyper_params
+            final_model.epochs = len(input_val.epoch_histories['train'])
+            self.models.append(final_model)
             self.history.append(model_results)
-        # self.history = [{'param':input_val.arch,'history':input_val.epoch_histories} for input_val in inputs]
+
         self.next(self.end)
 
     @step
